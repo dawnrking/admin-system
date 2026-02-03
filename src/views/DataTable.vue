@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import {
   SearchIcon,
@@ -9,9 +9,20 @@ import {
   DownloadIcon,
   RefreshIcon
 } from 'tdesign-icons-vue-next'
-import { mockDataItems, type DataItem } from '../mock/data'
+import { getDataItems, createDataItem, updateDataItem, deleteDataItem } from '../api'
 
-const dataItems = ref<DataItem[]>([...mockDataItems])
+interface DataItem {
+  id: number
+  orderNo: string
+  productName: string
+  category: string
+  price: number
+  quantity: number
+  status: string
+  createTime: string
+}
+
+const dataItems = ref<DataItem[]>([])
 const searchKeyword = ref('')
 const selectedCategory = ref('')
 const selectedStatus = ref('')
@@ -81,58 +92,66 @@ const openEditDialog = (row: DataItem) => {
   dialogVisible.value = true
 }
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
   if (!formData.value.productName || !formData.value.category) {
     MessagePlugin.warning('请填写必填项')
     return
   }
 
-  if (isEdit.value) {
-    const index = dataItems.value.findIndex(d => d.id === formData.value.id)
-    if (index !== -1) {
-      dataItems.value[index] = { ...dataItems.value[index], ...formData.value } as DataItem
+  try {
+    if (isEdit.value) {
+      await updateDataItem(formData.value.id!, formData.value)
+      const index = dataItems.value.findIndex(d => d.id === formData.value.id)
+      if (index !== -1) {
+        dataItems.value[index] = { ...dataItems.value[index], ...formData.value } as DataItem
+      }
+      MessagePlugin.success('更新成功')
+    } else {
+      const newItem = await createDataItem(formData.value) as DataItem
+      dataItems.value.unshift(newItem)
+      MessagePlugin.success('添加成功')
     }
-    MessagePlugin.success('更新成功')
-  } else {
-    const newItem: DataItem = {
-      id: Math.max(...dataItems.value.map(d => d.id)) + 1,
-      orderNo: formData.value.orderNo!,
-      productName: formData.value.productName!,
-      category: formData.value.category!,
-      price: formData.value.price || 0,
-      quantity: formData.value.quantity || 1,
-      status: formData.value.status || '待处理',
-      createTime: new Date().toISOString().split('T')[0]
-    }
-    dataItems.value.unshift(newItem)
-    MessagePlugin.success('添加成功')
+    dialogVisible.value = false
+  } catch (e) {
+    MessagePlugin.error('操作失败')
   }
-
-  dialogVisible.value = false
 }
 
-const handleDelete = (row: DataItem) => {
-  dataItems.value = dataItems.value.filter(d => d.id !== row.id)
-  MessagePlugin.success('删除成功')
+const handleDelete = async (row: DataItem) => {
+  try {
+    await deleteDataItem(row.id)
+    dataItems.value = dataItems.value.filter(d => d.id !== row.id)
+    MessagePlugin.success('删除成功')
+  } catch (e) {
+    MessagePlugin.error('删除失败')
+  }
 }
 
-const handleBatchDelete = () => {
+const handleBatchDelete = async () => {
   if (selectedRowKeys.value.length === 0) {
     MessagePlugin.warning('请选择要删除的数据')
     return
   }
-  dataItems.value = dataItems.value.filter(d => !selectedRowKeys.value.includes(d.id))
-  selectedRowKeys.value = []
-  MessagePlugin.success('批量删除成功')
+  try {
+    await Promise.all(selectedRowKeys.value.map(id => deleteDataItem(id)))
+    dataItems.value = dataItems.value.filter(d => !selectedRowKeys.value.includes(d.id))
+    selectedRowKeys.value = []
+    MessagePlugin.success('批量删除成功')
+  } catch (e) {
+    MessagePlugin.error('批量删除失败')
+  }
 }
 
-const handleRefresh = () => {
+const handleRefresh = async () => {
   loading.value = true
-  setTimeout(() => {
-    dataItems.value = [...mockDataItems]
-    loading.value = false
+  try {
+    dataItems.value = await getDataItems()
     MessagePlugin.success('刷新成功')
-  }, 500)
+  } catch (e) {
+    MessagePlugin.error('刷新失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 const handleExport = () => {
@@ -153,6 +172,21 @@ const pagination = ref({
   current: 1,
   pageSize: 10,
   total: computed(() => filteredData.value.length)
+})
+
+const fetchDataItems = async () => {
+  loading.value = true
+  try {
+    dataItems.value = await getDataItems()
+  } catch (e) {
+    MessagePlugin.error('获取数据列表失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  fetchDataItems()
 })
 </script>
 

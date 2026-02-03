@@ -1,17 +1,30 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   UserIcon,
   CartIcon,
   MoneyIcon,
   TrendingUpIcon
 } from 'tdesign-icons-vue-next'
-import { dashboardStats, chartData } from '../mock/data'
+import { getDashboardStats, getDashboardCharts } from '../api'
 
-const stats = ref([
+const dashboardStats = ref({
+  totalUsers: 0,
+  totalOrders: 0,
+  totalRevenue: 0,
+  growthRate: 0
+})
+
+const chartData = ref({
+  weeklyVisits: [] as number[],
+  monthlySales: [] as number[],
+  categoryDistribution: [] as { name: string; value: number }[]
+})
+
+const stats = computed(() => [
   {
     title: '用户总数',
-    value: dashboardStats.totalUsers,
+    value: dashboardStats.value.totalUsers,
     icon: UserIcon,
     color: 'bg-blue-500',
     change: '+12%',
@@ -19,7 +32,7 @@ const stats = ref([
   },
   {
     title: '订单总数',
-    value: dashboardStats.totalOrders,
+    value: dashboardStats.value.totalOrders,
     icon: CartIcon,
     color: 'bg-green-500',
     change: '+8%',
@@ -27,7 +40,7 @@ const stats = ref([
   },
   {
     title: '总收入',
-    value: '¥' + dashboardStats.totalRevenue.toLocaleString(),
+    value: '¥' + dashboardStats.value.totalRevenue.toLocaleString(),
     icon: MoneyIcon,
     color: 'bg-purple-500',
     change: '+15%',
@@ -35,7 +48,7 @@ const stats = ref([
   },
   {
     title: '增长率',
-    value: dashboardStats.growthRate + '%',
+    value: dashboardStats.value.growthRate + '%',
     icon: TrendingUpIcon,
     color: 'bg-orange-500',
     change: '+2.5%',
@@ -63,8 +76,21 @@ const getStatusColor = (status: string) => {
   return colors[status] || 'bg-gray-100 text-gray-600'
 }
 
-const maxVisit = Math.max(...chartData.weeklyVisits)
-const maxSales = Math.max(...chartData.monthlySales)
+const maxVisit = computed(() => Math.max(...(chartData.value.weeklyVisits.length ? chartData.value.weeklyVisits : [1])))
+const maxSales = computed(() => Math.max(...(chartData.value.monthlySales.length ? chartData.value.monthlySales : [1])))
+
+onMounted(async () => {
+  try {
+    const [statsData, chartsData] = await Promise.all([
+      getDashboardStats(),
+      getDashboardCharts()
+    ])
+    dashboardStats.value = statsData
+    chartData.value = chartsData
+  } catch (e) {
+    console.error('获取仪表盘数据失败', e)
+  }
+})
 </script>
 
 <template>
