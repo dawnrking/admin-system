@@ -17,7 +17,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
 // 登录
 export const login = (username: string, password: string) =>
-  request<{ token: string; user: { username: string; name: string } }>('/login', {
+  request<{ token: string; user: { username: string; name: string; avatar: string } }>('/login', {
     method: 'POST',
     body: JSON.stringify({ username, password })
   })
