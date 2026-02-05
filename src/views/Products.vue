@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next'
 import {
   AddIcon,
@@ -10,21 +10,9 @@ import {
   CheckCircleIcon,
   CloseCircleIcon
 } from 'tdesign-icons-vue-next'
-import { getProducts, createProduct, updateProduct, deleteProduct, updateProductStatus } from '../api'
+import { mockProducts, type Product } from '../mock/data'
 
-interface Product {
-  id: number
-  name: string
-  category: string
-  price: number
-  stock: number
-  status: 'on_sale' | 'off_sale'
-  image: string
-  description: string
-  createTime: string
-}
-
-const products = ref<Product[]>([])
+const products = ref<Product[]>([...mockProducts])
 const loading = ref(false)
 const searchKeyword = ref('')
 const statusFilter = ref('')
@@ -109,14 +97,9 @@ const handleDelete = (row: Product) => {
     body: `确定要删除商品"${row.name}"吗？`,
     confirmBtn: '确定',
     cancelBtn: '取消',
-    onConfirm: async () => {
-      try {
-        await deleteProduct(row.id)
-        products.value = products.value.filter(p => p.id !== row.id)
-        MessagePlugin.success('删除成功')
-      } catch (e) {
-        MessagePlugin.error('删除失败')
-      }
+    onConfirm: () => {
+      products.value = products.value.filter(p => p.id !== row.id)
+      MessagePlugin.success('删除成功')
       dialog.destroy()
     }
   })
@@ -130,45 +113,39 @@ const handleToggleStatus = (row: Product) => {
     body: `确定要${action}商品"${row.name}"吗？`,
     confirmBtn: '确定',
     cancelBtn: '取消',
-    onConfirm: async () => {
-      try {
-        await updateProductStatus(row.id, newStatus)
-        const index = products.value.findIndex(p => p.id === row.id)
-        if (index !== -1) {
-          products.value[index].status = newStatus
-          MessagePlugin.success(`${action}成功`)
-        }
-      } catch (e) {
-        MessagePlugin.error(`${action}失败`)
+    onConfirm: () => {
+      const index = products.value.findIndex(p => p.id === row.id)
+      if (index !== -1) {
+        products.value[index].status = newStatus
+        MessagePlugin.success(`${action}成功`)
       }
       dialog.destroy()
     }
   })
 }
 
-const handleSubmit = async () => {
+const handleSubmit = () => {
   if (!currentProduct.value.name || !currentProduct.value.category) {
     MessagePlugin.warning('请填写完整信息')
     return
   }
   
-  try {
-    if (isEdit.value) {
-      await updateProduct(currentProduct.value.id!, currentProduct.value)
-      const index = products.value.findIndex(p => p.id === currentProduct.value.id)
-      if (index !== -1) {
-        products.value[index] = { ...products.value[index], ...currentProduct.value } as Product
-        MessagePlugin.success('编辑成功')
-      }
-    } else {
-      const newProduct = await createProduct(currentProduct.value) as Product
-      products.value.unshift(newProduct)
-      MessagePlugin.success('添加成功')
+  if (isEdit.value) {
+    const index = products.value.findIndex(p => p.id === currentProduct.value.id)
+    if (index !== -1) {
+      products.value[index] = { ...products.value[index], ...currentProduct.value } as Product
+      MessagePlugin.success('编辑成功')
     }
-    dialogVisible.value = false
-  } catch (e) {
-    MessagePlugin.error('操作失败')
+  } else {
+    const newId = Math.max(...products.value.map(p => p.id)) + 1
+    products.value.unshift({
+      ...currentProduct.value,
+      id: newId,
+      createTime: new Date().toISOString().split('T')[0]
+    } as Product)
+    MessagePlugin.success('添加成功')
   }
+  dialogVisible.value = false
 }
 
 const getStatusTag = (status: string) => {
@@ -176,21 +153,6 @@ const getStatusTag = (status: string) => {
     ? { theme: 'success', text: '在售' }
     : { theme: 'default', text: '下架' }
 }
-
-const fetchProducts = async () => {
-  loading.value = true
-  try {
-    products.value = await getProducts()
-  } catch (e) {
-    MessagePlugin.error('获取商品列表失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(() => {
-  fetchProducts()
-})
 </script>
 
 <template>

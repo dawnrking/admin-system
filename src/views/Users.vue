@@ -1,20 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { SearchIcon, AddIcon, EditIcon, DeleteIcon } from 'tdesign-icons-vue-next'
-import { getUsers, createUser, updateUser, deleteUser } from '../api'
+import { mockUsers, type User } from '../mock/data'
 
-interface User {
-  id: number
-  name: string
-  email: string
-  phone: string
-  department: string
-  status: string
-  createTime: string
-}
-
-const users = ref<User[]>([])
+const users = ref<User[]>([...mockUsers])
 const searchKeyword = ref('')
 const selectedDepartment = ref('')
 const selectedStatus = ref('')
@@ -76,39 +66,37 @@ const openEditDialog = (row: User) => {
   dialogVisible.value = true
 }
 
-const handleSubmit = async () => {
+const handleSubmit = () => {
   if (!formData.value.name || !formData.value.email) {
     MessagePlugin.warning('请填写必填项')
     return
   }
 
-  try {
-    if (isEdit.value) {
-      await updateUser(formData.value.id!, formData.value)
-      const index = users.value.findIndex(u => u.id === formData.value.id)
-      if (index !== -1) {
-        users.value[index] = { ...users.value[index], ...formData.value } as User
-      }
-      MessagePlugin.success('更新成功')
-    } else {
-      const newUser = await createUser(formData.value) as User
-      users.value.unshift(newUser)
-      MessagePlugin.success('添加成功')
+  if (isEdit.value) {
+    const index = users.value.findIndex(u => u.id === formData.value.id)
+    if (index !== -1) {
+      users.value[index] = { ...users.value[index], ...formData.value } as User
     }
-    dialogVisible.value = false
-  } catch (e) {
-    MessagePlugin.error('操作失败')
+    MessagePlugin.success('更新成功')
+  } else {
+    const newUser: User = {
+      id: Math.max(...users.value.map(u => u.id)) + 1,
+      name: formData.value.name!,
+      email: formData.value.email!,
+      phone: formData.value.phone || '',
+      department: formData.value.department || '',
+      status: formData.value.status || '在职',
+      createTime: new Date().toISOString().split('T')[0]
+    }
+    users.value.unshift(newUser)
+    MessagePlugin.success('添加成功')
   }
+  dialogVisible.value = false
 }
 
-const handleDelete = async (row: User) => {
-  try {
-    await deleteUser(row.id)
-    users.value = users.value.filter(u => u.id !== row.id)
-    MessagePlugin.success('删除成功')
-  } catch (e) {
-    MessagePlugin.error('删除失败')
-  }
+const handleDelete = (row: User) => {
+  users.value = users.value.filter(u => u.id !== row.id)
+  MessagePlugin.success('删除成功')
 }
 
 const getStatusTag = (status: string) => {
@@ -124,18 +112,6 @@ const pagination = ref({
   current: 1,
   pageSize: 10,
   total: computed(() => filteredUsers.value.length)
-})
-
-const fetchUsers = async () => {
-  try {
-    users.value = await getUsers()
-  } catch (e) {
-    MessagePlugin.error('获取用户列表失败')
-  }
-}
-
-onMounted(() => {
-  fetchUsers()
 })
 </script>
 
